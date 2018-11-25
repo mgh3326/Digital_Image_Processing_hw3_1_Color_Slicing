@@ -1,14 +1,6 @@
 #include<iostream>
 #include<string>
-#include<algorithm>//for sort
 using namespace std;
-
-#define X_MAX 512
-#define Y_MAX 512
-
-
-unsigned char** mem_alloc2_d(int n_height, int n_width, unsigned char nlnit_val);
-
 unsigned char** mem_alloc2_d(int n_height, int n_width, unsigned char nlnit_val)
 {
 	unsigned char** rtn = new unsigned char*[n_height];
@@ -19,7 +11,6 @@ unsigned char** mem_alloc2_d(int n_height, int n_width, unsigned char nlnit_val)
 	}
 	return rtn;
 }
-
 unsigned char** padding(unsigned char** in, int n_height, int n_width, int n_filter_size)
 {
 	int n_pad_size = (int)(n_filter_size / 2);
@@ -64,37 +55,61 @@ unsigned char** padding(unsigned char** in, int n_height, int n_width, int n_fil
 
 	return pad;
 }
-
-void smooth_filter(unsigned char **in)
+void smooth_filter(unsigned char **in,unsigned char **out, int nHeight_in, int nWidth_in, int my_value)
 {
-	unsigned char** pad = padding(in, Y_MAX, X_MAX, 3);// 패딩 생성
-	unsigned char** out = mem_alloc2_d(Y_MAX, X_MAX, 0);//출력용 배열
-	int pad_size = 1;
-	double mask[3][3] = {//filter 행렬
-	{ (double)1 / 16, (double)2 / 16, (double)1 / 16 },
-	{ (double)2 / 16 , (double)4 / 16 , (double)2 / 16 },
-	{ (double)1 / 16, (double)2 / 16 , (double)1 / 16}
+	//unsigned char** pad = padding(in, nHeight_in, nWidth_in, 3);// 패딩 생성
+	//int pad_size = 1;
+	//double mask[3][3] = {//filter 행렬
+	//{ (double)1 / 16, (double)2 / 16, (double)1 / 16 },
+	//{ (double)2 / 16 , (double)4 / 16 , (double)2 / 16 },
+	//{ (double)1 / 16, (double)2 / 16 , (double)1 / 16}
+	//};
+	unsigned char** pad = padding(in, nHeight_in, nWidth_in, 5);// 패딩 생성
+	int pad_size = (int)(5 / 2);
+	double mask[5][5] = {
+		{ 0, 0,  (double)1 / 25, 0, 0 },
+		{ 0,  (double)2 / 25,  (double)2 / 25,  (double)2 / 25, 0 },
+		{  (double)1 / 25,  (double)2 / 25,  (double)5 / 25,  (double)2 / 25,  (double)1 / 25 },
+		{ 0,  (double)2 / 25,  (double)2 / 25,  (double)2 / 25, 0 },
+		{ 0, 0,  (double)1 / 25, 0, 0 }
 	};
-	for (int h = 0; h < Y_MAX; h++)
+	for (int h = 0; h < nHeight_in; h++)
 	{
-		for (int w = 0; w < X_MAX; w++)
+		for (int w = 0; w < nWidth_in; w++)
 		{
 			double pixel_value = 0;
-
+			if (pad[h + (pad_size)][w + (pad_size)] == 0)
+				continue;
 			for (int i = -pad_size; i <= pad_size; i++)
 				for (int j = -pad_size; j <= pad_size; j++)
-					pixel_value += pad[h + (i + pad_size)][w + (j + pad_size)] * ((double)mask[i + pad_size][j + pad_size]);
+				{
+				
+					if (pad[h + (i + pad_size)][w + (j + pad_size)] == 0)
+					{
+						/*pad[h + (i + pad_size)][w + (j + pad_size)] = my_value;*/
+						pixel_value += pad[h + (pad_size)][w + (pad_size)] * ((double)mask[i + pad_size][j + pad_size]);//중심값에 곱해버려볼까
+						//pixel_value += pad[h + (pad_size)][w + (pad_size)];//중심값에 곱해버려볼까
+
+					}
+					else {
+						pixel_value += pad[h + (i + pad_size)][w + (j + pad_size)] * ((double)mask[i + pad_size][j + pad_size]);
+
+					}
+
+				}
+			if (pixel_value > 255)
+				pixel_value = 255;
 			out[h][w] = (int)pixel_value;
 		}
 	}
-	string output = "filter3";
-	output.append(".raw");
-	FILE* outfile = fopen(output.c_str(), "w+b");
-	for (int i = 0; i < Y_MAX; i++)
-	{
-		fwrite(out[i], sizeof(char), X_MAX, outfile);
-	}
-	fclose(outfile);
+	//string output = "filter3";
+	//output.append(".raw");
+	//FILE* outfile = fopen(output.c_str(), "w+b");
+	//for (int i = 0; i < nHeight_in; i++)
+	//{
+	//	fwrite(out[i], sizeof(char), nWidth_in, outfile);
+	//}
+	//fclose(outfile);
 }
 typedef struct _RGB{
 	unsigned char r;//받을때 bgr순서라서 이렇게 함
@@ -187,25 +202,81 @@ int readBMPheader(int &nHeight_in, int &nWidth_in, string file_name)
 }
 int ColorSlicing(unsigned char** r, unsigned char** g, unsigned char** b, int nHeight_in, int nWidth_in)
 {
-	int r_value = 208;
-	int g_value = 187;
-	int b_value = 190;
-	int radius = 80;
+	unsigned char**copy_r = mem_alloc2_d(nHeight_in, nWidth_in, 0);//rgb가 아니라 bgr로 들어오는것 같기도 하다. 한번 알아보고 해야겠다.
+	unsigned char**copy_g = mem_alloc2_d(nHeight_in, nWidth_in, 0);
+	unsigned char**copy_b = mem_alloc2_d(nHeight_in, nWidth_in, 0);
+	int r_value = 204;
+	int g_value = 160;
+	int b_value = 151;
+	//	r_value = 157;
+//	g_value = 136;
+//	b_value = 127;
+	//	r_value = 131;
+//	g_value = 91;
+//	b_value = 81;
+	//	r_value = 182;
+//	g_value = 134;
+//	b_value = 124;
+		//	r_value = 182;
+//	g_value = 134;
+//	b_value = 124;
+//	r_value = 150;
+//	g_value = 116;
+//	b_value = 104;
+	int radius = 45;
 	for (int h = 0; h < nHeight_in; h++)
 	{
 		for (int w = 0; w < nWidth_in; w++)
 		{
-			/*r[h][w] = 0;
-
-			b[h][w] = 0;
-			g[h][w] = 0;
-*/
-			//208 187 190
+			
 			//원하는 부분을 찾아 내고 그 부분만 smoothing 필터를 적용한다.
 			if ((r[h][w] - r_value)*(r[h][w] - r_value) +(g[h][w] - g_value)*(g[h][w] - g_value) + (b[h][w] - b_value)*(b[h][w] - b_value) >radius*radius)
 			{
-				r[h][w] = g[h][w] = b[h][w] = 0;
+				copy_r[h][w] = copy_g[h][w] = copy_b[h][w] =0;
 			}
+			else {
+				copy_r[h][w] = r[h][w];
+				copy_g[h][w] = g[h][w];
+				copy_b[h][w] = b[h][w];
+			}
+		}
+	}
+	writeRGB(copy_r, copy_g, copy_b, nHeight_in, nWidth_in, "copy_rgb_output.raw");
+
+	unsigned char** out = mem_alloc2_d(nHeight_in, nWidth_in, 0);//출력용 배열
+
+	smooth_filter(copy_r, out, nHeight_in, nWidth_in, 204);
+	for (int h = 0; h < nHeight_in; h++)
+	{
+		for (int w = 0; w < nWidth_in; w++)
+		{
+			if(out[h][w]>0)
+			r[h][w] = out[h][w];
+
+		}
+	}
+out = mem_alloc2_d(nHeight_in, nWidth_in, 0);//출력용 배열
+
+	smooth_filter(copy_g, out, nHeight_in, nWidth_in, 160);
+	for (int h = 0; h < nHeight_in; h++)
+	{
+		for (int w = 0; w < nWidth_in; w++)
+		{
+			if (out[h][w] > 0)
+				g[h][w] = out[h][w];
+
+		}
+	}
+ out = mem_alloc2_d(nHeight_in, nWidth_in, 0);//출력용 배열
+
+	smooth_filter(copy_b,out, nHeight_in, nWidth_in, 151);
+	for (int h = 0; h < nHeight_in; h++)
+	{
+		for (int w = 0; w < nWidth_in; w++)
+		{
+			if (out[h][w] > 0)
+				b[h][w] = out[h][w];
+
 		}
 	}
 	return 0;
@@ -214,7 +285,7 @@ int main(void)
 {
 	int nHeight_in = 0;
 	int nWidth_in = 0;
-	string filename = "white.bmp";
+	string filename = "input.bmp";
 	readBMPheader(nWidth_in, nHeight_in, filename);
 	unsigned char**ch_in_r = mem_alloc2_d(nHeight_in, nWidth_in, 0);//rgb가 아니라 bgr로 들어오는것 같기도 하다. 한번 알아보고 해야겠다.
 	unsigned char**ch_in_g = mem_alloc2_d(nHeight_in, nWidth_in, 0);
@@ -223,7 +294,7 @@ int main(void)
 	readBMP(ch_in_r, ch_in_g, ch_in_b, nHeight_in, nWidth_in, filename);
 	ColorSlicing(ch_in_r, ch_in_g, ch_in_b, nHeight_in, nWidth_in);
 
-	writeRGB(ch_in_r, ch_in_g, ch_in_b, nHeight_in, nWidth_in, "out1.raw");
+	writeRGB(ch_in_r, ch_in_g, ch_in_b, nHeight_in, nWidth_in, "output100_5x5.raw");
 
 
 	
