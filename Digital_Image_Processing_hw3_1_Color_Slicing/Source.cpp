@@ -3,8 +3,8 @@
 #include<algorithm>//for sort
 using namespace std;
 
-#define X_MAX 256
-#define Y_MAX 256
+#define X_MAX 512
+#define Y_MAX 512
 
 
 unsigned char** mem_alloc2_d(int n_height, int n_width, unsigned char nlnit_val);
@@ -96,25 +96,137 @@ void smooth_filter(unsigned char **in)
 	}
 	fclose(outfile);
 }
+typedef struct _RGB{
+	unsigned char r;//받을때 bgr순서라서 이렇게 함
+	unsigned char g;
+	unsigned char b;
 
-int main(void)
+} RGB;
+int readBMP( unsigned char** r, unsigned char** g, unsigned char** b, int nHeight_in, int nWidth_in,string file_name)
 {
-	unsigned char** in_data = mem_alloc2_d(X_MAX, Y_MAX, 0);
-	// 이미지를 읽어온다
 
-	FILE* in = fopen("lena256.raw", "rb");
+	FILE* in = fopen(file_name.c_str(), "rb");
+
+	unsigned char* header = (unsigned char*)malloc(sizeof(unsigned char) * 54);
+	fread(header, 54, sizeof(unsigned char), in);
+
+	RGB** rgb = new RGB*[nHeight_in];
+
+	for (int n = 0; n < nHeight_in; n++)
+	{
+		rgb[n] = new RGB[nWidth_in];
+		memset(rgb[n], 0, sizeof(RGB) * nWidth_in);
+	}
+	for (int i = nHeight_in-1; i >= 0; i--)//BMP는 영상도 거꾸로 입력 해주어야 하네
+	{
+		fread(rgb[i], sizeof(RGB), nWidth_in, in);
+	}
+	fclose(in);
+	for (int h = 0; h < nHeight_in; h++)
+
+	{
+		for (int w = 0; w < nWidth_in; w++)
+
+		{
+			r[h][w] = rgb[h][w].b;//bit맵은 역순이라서 이런식으로 넣어주어야 한다.
+			g[h][w] = rgb[h][w].g;
+			b[h][w] = rgb[h][w].r;
+
+		}
+	}
+	return 0;
+}
+int writeRGB(unsigned char** r, unsigned char** g, unsigned char** b, int nHeight_in, int nWidth_in, string file_name)
+{
+	RGB** out = new RGB*[nHeight_in];
+	for (int n = 0; n < nHeight_in; n++)
+	{
+		out[n] = new RGB[nWidth_in];
+		memset(out[n], 0, sizeof(RGB) * nWidth_in);
+	}
+	for (int h = 0; h < nHeight_in; h++)
+
+	{
+		for (int w = 0; w < nWidth_in; w++)
+
+		{
+			out[h][w].b = b[h][w];
+			out[h][w].r = r[h][w];
+			out[h][w].g = g[h][w];
+
+		}
+	}
+	FILE* outfile = fopen(file_name.c_str(), "w+b");
+	/*for (int i = 0; i < nHeight_in; i++)
+	{
+		fwrite(out[i], sizeof(RGB), nWidth_in, outfile);
+	}*/
+	for (int i = 0; i < nHeight_in; i++)
+	{
+		fwrite(out[i], sizeof(RGB), nWidth_in, outfile);
+	}
+	return 0;
+
+
+}
+int readBMPheader(int &nHeight_in, int &nWidth_in, string file_name)
+{
+	FILE* in = fopen(file_name.c_str(), "rb");
+	unsigned char info[54];
+	
 	if (in == NULL)
 	{
 		printf("File not found!!\n");
-		return 0;
+		exit(1);
+		return 1;
 	}
-	for (int i = 0; i < Y_MAX; i++)
-	{
-		fread(in_data[i], sizeof(char), X_MAX, in);
-	}
-	fclose(in);
-	smooth_filter(in_data);
+	fread(info, sizeof(unsigned char), 54, in); // read the 54-byte header
 
+	nWidth_in = *(int*)&info[18];
+	nHeight_in = *(int*)&info[22];
+}
+int ColorSlicing(unsigned char** r, unsigned char** g, unsigned char** b, int nHeight_in, int nWidth_in)
+{
+	int r_value = 208;
+	int g_value = 187;
+	int b_value = 190;
+	int radius = 80;
+	for (int h = 0; h < nHeight_in; h++)
+	{
+		for (int w = 0; w < nWidth_in; w++)
+		{
+			/*r[h][w] = 0;
+
+			b[h][w] = 0;
+			g[h][w] = 0;
+*/
+			//208 187 190
+			//원하는 부분을 찾아 내고 그 부분만 smoothing 필터를 적용한다.
+			if ((r[h][w] - r_value)*(r[h][w] - r_value) +(g[h][w] - g_value)*(g[h][w] - g_value) + (b[h][w] - b_value)*(b[h][w] - b_value) >radius*radius)
+			{
+				r[h][w] = g[h][w] = b[h][w] = 0;
+			}
+		}
+	}
+	return 0;
+}
+int main(void)
+{
+	int nHeight_in = 0;
+	int nWidth_in = 0;
+	string filename = "white.bmp";
+	readBMPheader(nWidth_in, nHeight_in, filename);
+	unsigned char**ch_in_r = mem_alloc2_d(nHeight_in, nWidth_in, 0);//rgb가 아니라 bgr로 들어오는것 같기도 하다. 한번 알아보고 해야겠다.
+	unsigned char**ch_in_g = mem_alloc2_d(nHeight_in, nWidth_in, 0);
+	unsigned char**ch_in_b = mem_alloc2_d(nHeight_in, nWidth_in, 0);
+	
+	readBMP(ch_in_r, ch_in_g, ch_in_b, nHeight_in, nWidth_in, filename);
+	ColorSlicing(ch_in_r, ch_in_g, ch_in_b, nHeight_in, nWidth_in);
+
+	writeRGB(ch_in_r, ch_in_g, ch_in_b, nHeight_in, nWidth_in, "out1.raw");
+
+
+	
 
 	return 0;
 }
